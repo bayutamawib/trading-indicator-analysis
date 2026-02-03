@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-indicator-streamlit
+  namespace: default
+  labels:
+    app: trading-indicator
+    component: streamlit
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trading-indicator
+      component: streamlit
+  template:
+    metadata:
+      labels:
+        app: trading-indicator
+        component: streamlit
+    spec:
+      containers:
+      - name: streamlit
+        image: trading-indicator-analysis:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8501
+          name: streamlit
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: MLFLOW_TRACKING_URI
+          value: "http://mlflow-service:5000"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: models
+          mountPath: /app/models
+        - name: mlruns
+          mountPath: /app/mlruns
+        - name: reports
+          mountPath: /app/reports
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: models
+        emptyDir: {}
+      - name: mlruns
+        emptyDir: {}
+      - name: reports
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-server
+  namespace: default
+  labels:
+    app: trading-indicator
+    component: mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-indicator
+      component: mlflow
+  template:
+    metadata:
+      labels:
+        app: trading-indicator
+        component: mlflow
+    spec:
+      containers:
+      - name: mlflow
+        image: python:3.11-slim
+        ports:
+        - containerPort: 5000
+          name: mlflow
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        command:
+        - bash
+        - -c
+        - |
+          pip install mlflow &&
+          mlflow server \
+            --backend-store-uri file:///app/mlruns \
+            --default-artifact-root /app/mlruns/artifacts \
+            --host 0.0.0.0 \
+            --port 5000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: mlruns
+          mountPath: /app/mlruns
+      volumes:
+      - name: mlruns
+        emptyDir: {}

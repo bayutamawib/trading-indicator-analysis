@@ -1,0 +1,15 @@
+apiVersion: v2
+name: trading-indicator-analysis
+description: A Helm chart for Trading Indicator Analysis ML system
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - machine-learning
+  - trading
+  - technical-analysis
+  - streamlit
+  - mlflow
+maintainers:
+  - name: Your Name
+    email: your.email@example.com
